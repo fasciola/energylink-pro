@@ -1,0 +1,29 @@
+{
+    "app": {
+        "title": "EnergyLink Pro",
+        "tagline": "Connect with Licensed Electricians"
+    },
+    "auth": {
+        "welcome": "Welcome to EnergyLink Pro",
+        "selectRole": "Select your role",
+        "login": "Login",
+        "logout": "Logout",
+        "signUp": "Sign Up"
+    },
+    "roles": {
+        "customer": "Customer",
+        "electrician": "Electrician"
+    },
+    "common": {
+        "language": "Language",
+        "loading": "Loading...",
+        "error": "Error",
+        "success": "Success",
+        "save": "Save",
+        "cancel": "Cancel"
+    },
+    "dashboard": {
+        "customer": "Customer Dashboard",
+        "electrician": "Electrician Dashboard"
+    }
+}
