@@ -1,205 +1,280 @@
-import React, { useState } from 'react';
-import { useAuthContext } from '../contexts/AuthContext';
-import { updateUserProfile } from '../firebase/authService';
-import { FaUser, FaPhone, FaBriefcase, FaEdit, FaSave } from 'react-icons/fa';
+// src/pages/ProfilePage.tsx
+import React, { useState, useEffect } from "react";
+import { useAuthContext } from "../contexts/AuthContext";
+import { updateUserProfile } from "../firebase/authService";
+import { FaUser, FaEnvelope, FaPhone, FaTools, FaDollarSign } from "react-icons/fa";
 
-const ProfilePage = () => {
-  const { user, userData } = useAuthContext();
-  const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
-    displayName: userData?.displayName || '',
-    phone: userData?.phone || '',
-    bio: userData?.bio || '',
-    specialties: userData?.specialties?.join(', ') || '',
-    hourlyRate: userData?.hourlyRate || 50,
-  });
+export default function ProfilePage() {
+  const { userData, refreshUserData } = useAuthContext();
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  // Form state
+  const [displayName, setDisplayName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [bio, setBio] = useState("");
+  const [specialties, setSpecialties] = useState<string[]>([]);
+  const [hourlyRate, setHourlyRate] = useState<number>(0);
+  const [availability, setAvailability] = useState(true);
+  const [specialtyInput, setSpecialtyInput] = useState("");
+
+  useEffect(() => {
+    if (userData) {
+      setDisplayName(userData.displayName || "");
+      setPhone(userData.phone || "");
+      setBio((userData as any).bio || "");
+      setSpecialties((userData as any).specialties || []);
+      setHourlyRate((userData as any).hourlyRate || 0);
+      setAvailability((userData as any).availability !== false);
+    }
+  }, [userData]);
+
+  const addSpecialty = () => {
+    if (specialtyInput.trim() && !specialties.includes(specialtyInput.trim())) {
+      setSpecialties([...specialties, specialtyInput.trim()]);
+      setSpecialtyInput("");
+    }
+  };
+
+  const removeSpecialty = (specialty: string) => {
+    setSpecialties(specialties.filter(s => s !== specialty));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!userData) return;
+
     setLoading(true);
-    setMessage('');
+    setError("");
+    setSuccess("");
 
     try {
-      const result = await updateUserProfile(user?.uid || '', {
-        displayName: formData.displayName,
-        phone: formData.phone,
-        bio: formData.bio,
-        specialties: formData.specialties.split(',').map(s => s.trim()).filter(Boolean),
-        hourlyRate: formData.hourlyRate,
+      const result = await updateUserProfile(userData.uid, {
+        displayName,
+        phone,
+        ...(userData.role === "electrician" && {
+          bio,
+          specialties,
+          hourlyRate,
+          availability,
+        }),
       });
 
       if (result.success) {
-        setMessage('Profile updated successfully!');
-        setIsEditing(false);
+        setSuccess("Profile updated successfully!");
+        await refreshUserData();
       } else {
-        setMessage(`Error: ${result.error}`);
+        setError(result.error || "Failed to update profile");
       }
-    } catch (error: any) {
-      setMessage(`Error: ${error.message}`);
+    } catch (err: any) {
+      setError(err.message || "An error occurred");
     } finally {
       setLoading(false);
     }
   };
 
+  if (!userData) {
+    return (
+      <div className="bg-white rounded-xl shadow border p-6">
+        <h2 className="text-xl font-bold text-gray-900">Loading profile...</h2>
+      </div>
+    );
+  }
+
+  const isElectrician = userData.role === "electrician";
+
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-        <div className="bg-gradient-to-r from-blue-600 to-emerald-600 p-6 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">Your Profile</h1>
-              <p className="opacity-90">Manage your account information</p>
-            </div>
-            <button
-              onClick={() => setIsEditing(!isEditing)}
-              className="flex items-center gap-2 px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50"
-            >
-              {isEditing ? <FaSave /> : <FaEdit />}
-              {isEditing ? 'Cancel' : 'Edit Profile'}
-            </button>
+    <div className="max-w-4xl mx-auto">
+      <div className="bg-white rounded-2xl shadow-sm border p-8">
+        <div className="flex items-center gap-4 mb-8">
+          <div className="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold overflow-hidden">
+            {userData.photoURL ? (
+              <img src={userData.photoURL} alt={displayName} className="w-full h-full object-cover" />
+            ) : (
+              displayName?.charAt(0) || "U"
+            )}
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{displayName || "Your Profile"}</h1>
+            <p className="text-gray-600 capitalize">{userData.role}</p>
           </div>
         </div>
 
-        <div className="p-6">
-          {message && (
-            <div className={`mb-6 p-4 rounded-lg ${message.includes('Error') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
-              {message}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
+            {success}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Basic Info */}
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold text-gray-900">Basic Information</h2>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                <FaUser className="inline mr-2" />
+                Display Name
+              </label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                required
+              />
             </div>
-          )}
 
-          <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <FaUser className="inline mr-2" />
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  value={formData.displayName}
-                  onChange={(e) => setFormData({...formData, displayName: e.target.value})}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  disabled={!isEditing}
-                  required
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                <FaEnvelope className="inline mr-2" />
+                Email
+              </label>
+              <input
+                type="email"
+                value={userData.email}
+                disabled
+                className="w-full px-4 py-2 border rounded-lg bg-gray-50"
+              />
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <FaPhone className="inline mr-2" />
-                  Phone Number
-                </label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  disabled={!isEditing}
-                  required
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                <FaPhone className="inline mr-2" />
+                Phone
+              </label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="Your phone number"
+              />
+            </div>
+          </div>
 
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Bio/Description
-                </label>
-                <textarea
-                  value={formData.bio}
-                  onChange={(e) => setFormData({...formData, bio: e.target.value})}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 h-32"
-                  disabled={!isEditing}
-                  placeholder="Tell customers about your experience and specialties..."
-                />
-              </div>
+          {/* Electrician-only fields */}
+          {isElectrician && (
+            <>
+              <div className="border-t pt-6 space-y-4">
+                <h2 className="text-lg font-semibold text-gray-900">Professional Information</h2>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Bio / Description
+                  </label>
+                  <textarea
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    rows={4}
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Tell customers about yourself, your experience, and your services..."
+                  />
+                </div>
 
-              {userData?.role === 'electrician' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <FaBriefcase className="inline mr-2" />
-                      Specialties
-                    </label>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <FaTools className="inline mr-2" />
+                    Specialties
+                  </label>
+                  <div className="flex gap-2 mb-2">
                     <input
                       type="text"
-                      value={formData.specialties}
-                      onChange={(e) => setFormData({...formData, specialties: e.target.value})}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      disabled={!isEditing}
-                      placeholder="Residential, Commercial, Solar, etc."
+                      value={specialtyInput}
+                      onChange={(e) => setSpecialtyInput(e.target.value)}
+                      className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="e.g., Residential Wiring"
+                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addSpecialty())}
                     />
+                    <button
+                      type="button"
+                      onClick={addSpecialty}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      Add
+                    </button>
                   </div>
+                  <div className="flex flex-wrap gap-2">
+                    {specialties.map((specialty) => (
+                      <span
+                        key={specialty}
+                        className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm flex items-center gap-2"
+                      >
+                        {specialty}
+                        <button
+                          type="button"
+                          onClick={() => removeSpecialty(specialty)}
+                          className="text-blue-600 hover:text-blue-800"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Hourly Rate ($)
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <FaDollarSign className="inline mr-2" />
+                    Hourly Rate ($/hr)
+                  </label>
+                  <input
+                    type="number"
+                    value={hourlyRate}
+                    onChange={(e) => setHourlyRate(parseInt(e.target.value))}
+                    min="0"
+                    step="5"
+                    className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Availability
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        checked={availability === true}
+                        onChange={() => setAvailability(true)}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <span>Available for work</span>
                     </label>
-                    <input
-                      type="number"
-                      value={formData.hourlyRate}
-                      onChange={(e) => setFormData({...formData, hourlyRate: Number(e.target.value)})}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      disabled={!isEditing}
-                      min="20"
-                      max="200"
-                      step="5"
-                    />
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        checked={availability === false}
+                        onChange={() => setAvailability(false)}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <span>Not available</span>
+                    </label>
                   </div>
-                </>
-              )}
-            </div>
+                </div>
+              </div>
+            </>
+          )}
 
-            {isEditing && (
-              <div className="mt-8 flex justify-end gap-4">
-                <button
-                  type="button"
-                  onClick={() => setIsEditing(false)}
-                  className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {loading ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
-            )}
-          </form>
-
-          <div className="mt-8 pt-8 border-t">
-            <h3 className="text-lg font-semibold mb-4">Account Information</h3>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-gray-500">Email</p>
-                <p className="font-medium">{user?.email}</p>
-              </div>
-              <div>
-                <p className="text-gray-500">User ID</p>
-                <p className="font-medium text-xs truncate">{user?.uid}</p>
-              </div>
-              <div>
-                <p className="text-gray-500">Account Type</p>
-                <p className="font-medium capitalize">{userData?.role}</p>
-              </div>
-              <div>
-                <p className="text-gray-500">Member Since</p>
-                <p className="font-medium">
-                  {userData?.createdAt instanceof Date 
-                    ? userData.createdAt.toLocaleDateString()
-                    : 'N/A'
-                  }
-                </p>
-              </div>
-            </div>
+          <div className="border-t pt-6">
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50"
+            >
+              {loading ? "Saving..." : "Save Changes"}
+            </button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );
-};
-
-export default ProfilePage;
+}
